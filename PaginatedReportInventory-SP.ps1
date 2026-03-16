@@ -36,7 +36,7 @@
 .PARAMETER UseAdminApis
   Use admin endpoints to list all workspaces (requires the service principal to be
   a Fabric admin or enabled in the Power BI admin portal under
-  "Service principals can use Fabric APIs")
+  "Service principals can call Fabric public APIs")
 
 .PARAMETER MaxReports
   Cap the number of reports exported (0 = unlimited, useful for testing)
@@ -49,7 +49,7 @@
 
   Azure AD app registration requirements:
     - App must have Power BI Service permissions (Tenant.Read.All or similar)
-    - For admin APIs: enable "Allow service principals to use Power BI APIs"
+    - For admin APIs: enable "Service principals can call Fabric public APIs"
       in Power BI Admin Portal > Tenant settings
     - Add the service principal to a security group allowed in those settings
 
@@ -139,7 +139,7 @@ function Get-Workspaces {
     try {
       return (Invoke-PbiRest -Method Get -RelativeUrl "admin/groups?`$top=$top").value
     } catch {
-      throw "Failed to call admin API (admin/groups). Ensure the service principal is in a security group enabled for 'Allow service principals to use read-only admin APIs' in the Power BI Admin Portal. Note: group membership changes can take up to 15 minutes to propagate. Error: $($_.Exception.Message)"
+      throw "Failed to call admin API (admin/groups). Ensure the service principal is in a security group enabled for 'Service principals can call Fabric public APIs' in the Power BI Admin Portal. Note: group membership changes can take up to 15 minutes to propagate. Error: $($_.Exception.Message)"
     }
   } else {
     return (Invoke-PbiRest -Method Get -RelativeUrl "groups").value

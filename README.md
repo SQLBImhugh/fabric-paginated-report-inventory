@@ -82,7 +82,7 @@ Connect-AzAccount
 1. Register an app in **Azure AD / Entra ID**
 2. Create a client secret and store it in **Azure Key Vault** (recommended)
 3. In **Power BI Admin Portal → Tenant settings**, enable:
-   - *"Service principals can use Fabric APIs"*
+   - *"Service principals can call Fabric public APIs"*
 4. Add the service principal to a security group allowed in that setting
 5. Grant the calling identity **Get** permission on the Key Vault secret (if using Key Vault)
 
@@ -140,7 +140,7 @@ When using the service principal version (`PaginatedReportInventory-SP.ps1`) wit
 
 **Additional requirements for service principal admin API access:**
 - The app registration must **not** have any admin-consent-required Power BI permissions set in the Azure portal
-- The service principal must be a member of a security group enabled under **"Allow service principals to use read-only admin APIs"** in the Power BI Admin Portal
+- The service principal must be a member of a security group enabled under **"Service principals can call Fabric public APIs"** in the Power BI Admin Portal
 - Security group membership changes can take **up to 15 minutes** to propagate
 
 ## Notes
