@@ -4,7 +4,8 @@
   extracts authored SQL/SP and datasource metadata from RDL definitions.
 
 .DESCRIPTION
-  - Authenticates to Power BI using a service principal (Client ID + Client Secret or Certificate)
+  - Authenticates to Power BI using a service principal (Client ID + Client Secret)
+  - Optionally retrieves the client secret from Azure Key Vault (security best practice)
   - Lists workspaces (admin tenant-wide if -UseAdminApis, else only accessible workspaces)
   - Identifies paginated reports (format=RDL) in each workspace
   - Exports each RDL and parses dataset Query.CommandText, Query.CommandType, DataSourceName,
@@ -19,11 +20,15 @@
   Application (client) ID of the service principal
 
 .PARAMETER ClientSecret
-  Client secret for the service principal. If omitted, -CertificateThumbprint is required.
+  Client secret for the service principal. If omitted, -KeyVaultName and -SecretName are required
+  to retrieve the secret from Azure Key Vault.
 
-.PARAMETER CertificateThumbprint
-  Thumbprint of a certificate installed in the current user's certificate store.
-  Used instead of -ClientSecret for certificate-based authentication.
+.PARAMETER KeyVaultName
+  Name of the Azure Key Vault containing the client secret. Requires Az.KeyVault module
+  and an authenticated Azure session (Connect-AzAccount).
+
+.PARAMETER SecretName
+  Name of the secret in Azure Key Vault that holds the client secret value.
 
 .PARAMETER OutputRoot
   Folder to write outputs
@@ -39,6 +44,8 @@
 .NOTES
   Prerequisites:
     Install-Module -Name MicrosoftPowerBIMgmt -Scope CurrentUser -Force
+    Install-Module -Name Az.KeyVault -Scope CurrentUser -Force    # only if using Key Vault
+    Install-Module -Name Az.Accounts -Scope CurrentUser -Force    # only if using Key Vault
 
   Azure AD app registration requirements:
     - App must have Power BI Service permissions (Tenant.Read.All or similar)
@@ -50,9 +57,10 @@
     .\PaginatedReportInventory-SP.ps1 -TenantId "your-tenant-id" `
       -ClientId "your-client-id" -ClientSecret "your-secret" -UseAdminApis
 
-  Usage with certificate:
+  Usage with Azure Key Vault (recommended):
+    Connect-AzAccount
     .\PaginatedReportInventory-SP.ps1 -TenantId "your-tenant-id" `
-      -ClientId "your-client-id" -CertificateThumbprint "ABC123..." -UseAdminApis
+      -ClientId "your-client-id" -KeyVaultName "my-keyvault" -SecretName "pbi-sp-secret" -UseAdminApis
 
   Usage with max reports limit:
     .\PaginatedReportInventory-SP.ps1 -TenantId "your-tenant-id" `
@@ -63,7 +71,8 @@ param(
   [Parameter(Mandatory)][string]$TenantId,
   [Parameter(Mandatory)][string]$ClientId,
   [string]$ClientSecret,
-  [string]$CertificateThumbprint,
+  [string]$KeyVaultName,
+  [string]$SecretName,
   [string]$OutputRoot = ".\PaginatedReportInventory",
   [switch]$UseAdminApis,
   [int]$MaxReports = 0   # 0 = unlimited; set to a positive number to cap reports exported (useful for testing)
@@ -76,20 +85,27 @@ $WarningPreference = "SilentlyContinue"
 
 # ---------- Authentication ----------
 
-if (-not $ClientSecret -and -not $CertificateThumbprint) {
-  throw "You must provide either -ClientSecret or -CertificateThumbprint."
+if (-not $ClientSecret -and (-not $KeyVaultName -or -not $SecretName)) {
+  throw "You must provide either -ClientSecret or both -KeyVaultName and -SecretName to retrieve the secret from Azure Key Vault."
+}
+
+# Retrieve secret from Azure Key Vault if not provided directly
+if (-not $ClientSecret) {
+  Write-Host "Retrieving client secret from Key Vault '$KeyVaultName' (secret: $SecretName) ..."
+  try {
+    $kvSecret = Get-AzKeyVaultSecret -VaultName $KeyVaultName -Name $SecretName -ErrorAction Stop
+    $ClientSecret = $kvSecret.SecretValue | ConvertFrom-SecureString -AsPlainText
+  } catch {
+    throw "Failed to retrieve secret '$SecretName' from Key Vault '$KeyVaultName'. Ensure you have run Connect-AzAccount and have Get access. Error: $($_.Exception.Message)"
+  }
+  Write-Host "Secret retrieved successfully." -ForegroundColor Green
 }
 
 Write-Host "Authenticating as service principal $ClientId in tenant $TenantId ..."
 
-if ($ClientSecret) {
-  $secureSecret = ConvertTo-SecureString $ClientSecret -AsPlainText -Force
-  $credential = New-Object System.Management.Automation.PSCredential($ClientId, $secureSecret)
-  Connect-PowerBIServiceAccount -ServicePrincipal -Tenant $TenantId -Credential $credential -WarningAction SilentlyContinue | Out-Null
-} else {
-  Connect-PowerBIServiceAccount -ServicePrincipal -Tenant $TenantId `
-    -CertificateThumbprint $CertificateThumbprint -ApplicationId $ClientId -WarningAction SilentlyContinue | Out-Null
-}
+$secureSecret = ConvertTo-SecureString $ClientSecret -AsPlainText -Force
+$credential = New-Object System.Management.Automation.PSCredential($ClientId, $secureSecret)
+Connect-PowerBIServiceAccount -ServicePrincipal -Tenant $TenantId -Credential $credential -WarningAction SilentlyContinue | Out-Null
 
 Write-Host "Authenticated successfully." -ForegroundColor Green
 

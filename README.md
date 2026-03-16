@@ -33,6 +33,9 @@ Two versions are included:
 
 ```powershell
 Install-Module -Name MicrosoftPowerBIMgmt -Scope CurrentUser -Force
+# Only if using Azure Key Vault:
+Install-Module -Name Az.Accounts -Scope CurrentUser -Force
+Install-Module -Name Az.KeyVault -Scope CurrentUser -Force
 ```
 
 ## Usage — Interactive Login
@@ -60,13 +63,14 @@ Connect-PowerBIServiceAccount
 No pre-authentication needed; credentials are passed as parameters:
 
 ```powershell
-# With client secret
+# With client secret passed directly
 .\PaginatedReportInventory-SP.ps1 -TenantId "your-tenant-id" `
   -ClientId "your-client-id" -ClientSecret "your-secret" -UseAdminApis
 
-# With certificate thumbprint
+# With Azure Key Vault (recommended — avoids secrets in scripts/history)
+Connect-AzAccount
 .\PaginatedReportInventory-SP.ps1 -TenantId "your-tenant-id" `
-  -ClientId "your-client-id" -CertificateThumbprint "ABC123..." -UseAdminApis
+  -ClientId "your-client-id" -KeyVaultName "my-keyvault" -SecretName "pbi-sp-secret" -UseAdminApis
 
 # With max reports limit
 .\PaginatedReportInventory-SP.ps1 -TenantId "your-tenant-id" `
@@ -76,10 +80,11 @@ No pre-authentication needed; credentials are passed as parameters:
 ### Service Principal Setup
 
 1. Register an app in **Azure AD / Entra ID**
-2. Create a client secret or upload a certificate
+2. Create a client secret and store it in **Azure Key Vault** (recommended)
 3. In **Power BI Admin Portal → Tenant settings**, enable:
    - *"Service principals can use Fabric APIs"*
 4. Add the service principal to a security group allowed in that setting
+5. Grant the calling identity **Get** permission on the Key Vault secret (if using Key Vault)
 
 ## Parameters
 
@@ -97,8 +102,9 @@ No pre-authentication needed; credentials are passed as parameters:
 |-----------|------|---------|-------------|
 | `-TenantId` | String | *(required)* | Azure AD / Entra ID tenant ID |
 | `-ClientId` | String | *(required)* | Application (client) ID |
-| `-ClientSecret` | String | — | Client secret (provide this **or** `-CertificateThumbprint`) |
-| `-CertificateThumbprint` | String | — | Certificate thumbprint (provide this **or** `-ClientSecret`) |
+| `-ClientSecret` | String | — | Client secret (provide this **or** `-KeyVaultName`/`-SecretName`) |
+| `-KeyVaultName` | String | — | Azure Key Vault name containing the secret |
+| `-SecretName` | String | — | Secret name in Key Vault (required with `-KeyVaultName`) |
 | `-OutputRoot` | String | `.\PaginatedReportInventory` | Folder to write output files |
 | `-UseAdminApis` | Switch | Off | Use admin endpoints to list all tenant workspaces |
 | `-MaxReports` | Int | `0` (unlimited) | Cap the number of reports exported (for testing) |
