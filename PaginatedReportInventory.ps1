@@ -219,7 +219,7 @@ New-Item -ItemType Directory -Path $rdlFolder -Force | Out-Null
 # Caller must have already run Connect-PowerBIServiceAccount
 $null = Get-PowerBIAccessTokenString
 
-$workspaces = Get-Workspaces
+$workspaces = @(Get-Workspaces)
 Write-Host "Found $($workspaces.Count) workspace(s)"
 
 $dsOut = New-Object System.Collections.Generic.List[object]

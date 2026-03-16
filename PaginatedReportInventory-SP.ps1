@@ -90,20 +90,22 @@ if (-not $ClientSecret -and (-not $KeyVaultName -or -not $SecretName)) {
 }
 
 # Retrieve secret from Azure Key Vault if not provided directly
+$secureSecret = $null
 if (-not $ClientSecret) {
   Write-Host "Retrieving client secret from Key Vault '$KeyVaultName' (secret: $SecretName) ..."
   try {
     $kvSecret = Get-AzKeyVaultSecret -VaultName $KeyVaultName -Name $SecretName -ErrorAction Stop
-    $ClientSecret = $kvSecret.SecretValue | ConvertFrom-SecureString -AsPlainText
+    $secureSecret = $kvSecret.SecretValue
   } catch {
     throw "Failed to retrieve secret '$SecretName' from Key Vault '$KeyVaultName'. Ensure you have run Connect-AzAccount and have Get access. Error: $($_.Exception.Message)"
   }
   Write-Host "Secret retrieved successfully." -ForegroundColor Green
+} else {
+  $secureSecret = ConvertTo-SecureString $ClientSecret -AsPlainText -Force
 }
 
 Write-Host "Authenticating as service principal $ClientId in tenant $TenantId ..."
 
-$secureSecret = ConvertTo-SecureString $ClientSecret -AsPlainText -Force
 $credential = New-Object System.Management.Automation.PSCredential($ClientId, $secureSecret)
 Connect-PowerBIServiceAccount -ServicePrincipal -Tenant $TenantId -Credential $credential -WarningAction SilentlyContinue | Out-Null
 
@@ -287,7 +289,7 @@ New-Item -ItemType Directory -Path $rdlFolder -Force | Out-Null
 # Verify token is valid
 $null = Get-PowerBIAccessTokenString
 
-$workspaces = Get-Workspaces
+$workspaces = @(Get-Workspaces)
 Write-Host "Found $($workspaces.Count) workspace(s)"
 
 $dsOut = New-Object System.Collections.Generic.List[object]
