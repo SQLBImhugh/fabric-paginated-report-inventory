@@ -136,7 +136,11 @@ function Invoke-PbiRest {
 function Get-Workspaces {
   if ($UseAdminApis) {
     $top = 5000
-    return (Invoke-PbiRest -Method Get -RelativeUrl "admin/groups?`$top=$top").value
+    try {
+      return (Invoke-PbiRest -Method Get -RelativeUrl "admin/groups?`$top=$top").value
+    } catch {
+      throw "Failed to call admin API (admin/groups). Ensure the service principal is in a security group enabled for 'Allow service principals to use read-only admin APIs' in the Power BI Admin Portal. Note: group membership changes can take up to 15 minutes to propagate. Error: $($_.Exception.Message)"
+    }
   } else {
     return (Invoke-PbiRest -Method Get -RelativeUrl "groups").value
   }
