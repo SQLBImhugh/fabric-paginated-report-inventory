@@ -148,7 +148,11 @@ function Get-Workspaces {
 
 function Get-PbiReportsInWorkspace {
   param([string]$WorkspaceId)
-  return (Invoke-PbiRest -Method Get -RelativeUrl "groups/$WorkspaceId/reports").value
+  if ($UseAdminApis) {
+    return (Invoke-PbiRest -Method Get -RelativeUrl "admin/groups/$WorkspaceId/reports").value
+  } else {
+    return (Invoke-PbiRest -Method Get -RelativeUrl "groups/$WorkspaceId/reports").value
+  }
 }
 
 function Export-PaginatedReportRdl {
@@ -163,6 +167,8 @@ function Export-PaginatedReportRdl {
 
   if (Test-Path $path) { Remove-Item -LiteralPath $path -Force }
 
+  # Admin API doesn't support RDL export — use the regular endpoint.
+  # The SP needs at least Viewer role on the workspace for this call.
   Invoke-PowerBIRestMethod `
     -Url "groups/$WorkspaceId/reports/$ReportId/Export" `
     -Method Get `
@@ -177,6 +183,7 @@ function Get-PaginatedReportDatasources {
     [string]$WorkspaceId,
     [string]$ReportId
   )
+  # No admin endpoint exists for report datasources — always use the regular endpoint
   return (Invoke-PbiRest -Method Get -RelativeUrl "groups/$WorkspaceId/reports/$ReportId/datasources").value
 }
 
@@ -334,7 +341,13 @@ foreach ($ws in $workspaces) {
     Write-Host "  Paginated report: $($r.name)"
 
     # Export RDL
-    $rdlPath = Export-PaginatedReportRdl -WorkspaceId $wsId -ReportId $r.id -ReportName $r.name -RdlFolder $rdlFolder
+    $rdlPath = $null
+    try {
+      $rdlPath = Export-PaginatedReportRdl -WorkspaceId $wsId -ReportId $r.id -ReportName $r.name -RdlFolder $rdlFolder
+    } catch {
+      Write-Host "WARNING: Could not export RDL for $($r.name): $($_.Exception.Message)" -ForegroundColor Yellow
+      continue
+    }
 
     # Get API datasource metadata
     $apiDs = @()

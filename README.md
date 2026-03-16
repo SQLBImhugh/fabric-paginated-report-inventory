@@ -118,6 +118,31 @@ The script creates two files in the output folder:
 
 Exported RDL files are saved in a `rdl` subfolder within the output directory.
 
+## Service Principal Limitations
+
+When using the service principal version (`PaginatedReportInventory-SP.ps1`) with `-UseAdminApis`, be aware of the following Power BI REST API limitations:
+
+| Operation | Admin API Available | Notes |
+|-----------|:-------------------:|-------|
+| List workspaces | ✅ Yes | `admin/groups` — works tenant-wide |
+| List reports in workspace | ✅ Yes | `admin/groups/{id}/reports` — works tenant-wide |
+| Export RDL definition | ❌ No | `groups/{id}/reports/{id}/Export` — requires the SP to have a **workspace role** (Viewer or above) |
+| Get report datasources | ❌ No | `groups/{id}/reports/{id}/datasources` — requires the SP to have a **workspace role** (Viewer or above) |
+
+**What this means in practice:**
+
+- The script will **discover all paginated reports** across the tenant via admin APIs
+- However, it can only **export RDL files** and **retrieve datasource metadata** for workspaces where the service principal has been granted at least **Viewer** access
+- Reports in inaccessible workspaces will show a warning and be skipped — the script will not crash
+- The interactive version (`PaginatedReportInventory.ps1`) does **not** have this limitation when run by a Fabric admin user
+
+**To get full coverage with the SP version**, add the service principal as a **Viewer** to each workspace, or use the interactive version with an admin account.
+
+**Additional requirements for service principal admin API access:**
+- The app registration must **not** have any admin-consent-required Power BI permissions set in the Azure portal
+- The service principal must be a member of a security group enabled under **"Allow service principals to use read-only admin APIs"** in the Power BI Admin Portal
+- Security group membership changes can take **up to 15 minutes** to propagate
+
 ## Notes
 
 - Personal workspaces (`PersonalGroup` type) are automatically skipped when using `-UseAdminApis`
