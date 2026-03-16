@@ -1,0 +1,6 @@
+# Output folders
+PaginatedReportInventory/
+
+# PowerShell module artifacts
+*.psm1
+*.psd1
